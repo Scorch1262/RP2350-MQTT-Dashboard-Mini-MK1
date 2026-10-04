@@ -1,0 +1,981 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>MQTT Dashboard</title>
+<script src="/chart.js"></script>
+<style>
+* { -webkit-box-sizing:border-box; box-sizing:border-box; margin:0; padding:0; }
+html { -webkit-text-size-adjust:100%; }
+body { background:#2b2b2b; color:#fff;
+  font-family:-apple-system,"Helvetica Neue",Arial,sans-serif;
+  -webkit-tap-highlight-color:transparent; }
+
+#topbar {
+  display:-webkit-box; display:-webkit-flex; display:flex;
+  -webkit-align-items:center; align-items:center;
+  -webkit-justify-content:space-between; justify-content:space-between;
+  padding:9px 14px; background:#1a1a1a;
+  border-bottom:1px solid #333; position:sticky; top:0; z-index:50;
+}
+#topbar h2 { font-size:15px; font-weight:600; letter-spacing:0.3px; }
+#rangeSelect {
+  background:#333; color:#fff; border:1px solid #555; border-radius:4px;
+  padding:5px 6px; font-size:13px; -webkit-appearance:none; appearance:none;
+}
+
+#addBtn {
+  position:fixed; bottom:22px; right:22px;
+  width:52px; height:52px; border-radius:50%;
+  background:#0078d7; color:#fff; font-size:28px;
+  border:none; cursor:pointer; z-index:100;
+  line-height:52px; text-align:center; padding:0;
+  -webkit-box-shadow:0 4px 16px rgba(0,120,215,.6);
+  box-shadow:0 4px 16px rgba(0,120,215,.6);
+}
+#addBtn:active { opacity:.75; }
+
+#dashboard { padding-bottom:90px; }
+
+.group-section { margin:10px 8px 0; border-radius:10px; overflow:hidden; }
+.group-header {
+  display:-webkit-box; display:-webkit-flex; display:flex;
+  -webkit-align-items:center; align-items:center;
+  padding:8px 12px; cursor:pointer;
+  -webkit-user-select:none; user-select:none;
+}
+.group-header-title { -webkit-flex:1; flex:1; font-size:13px; font-weight:700; letter-spacing:0.5px; }
+.group-toggle { background:none; border:none; color:#fff; font-size:16px; cursor:pointer; padding:0 6px 0 0; line-height:1; }
+.group-hbtn {
+  background:rgba(0,0,0,.25); color:#fff; border:none;
+  border-radius:4px; width:22px; height:22px;
+  font-size:11px; cursor:pointer; padding:0; margin-left:4px;
+  line-height:22px; text-align:center;
+}
+.group-body { padding:0 0 6px; }
+.group-body.collapsed { display:none; }
+
+.widget-grid {
+  display:-webkit-box; display:-webkit-flex; display:flex;
+  -webkit-flex-wrap:wrap; flex-wrap:wrap; padding:6px 4px 2px;
+}
+.widget-card {
+  -webkit-box-sizing:border-box; box-sizing:border-box;
+  width:-webkit-calc(25% - 12px); width:calc(25% - 12px);
+  min-width:115px; height:130px; margin:6px; border-radius:12px;
+  cursor:pointer; position:relative;
+  display:-webkit-box; display:-webkit-flex; display:flex;
+  -webkit-flex-direction:column; flex-direction:column;
+  -webkit-justify-content:center; justify-content:center;
+  -webkit-align-items:center; align-items:center; overflow:hidden;
+  -webkit-user-select:none; user-select:none;
+  -webkit-transition:background-color .28s; transition:background-color .28s;
+}
+.widget-card:active { opacity:.75; }
+.wicon { font-size:28px; line-height:1.15; pointer-events:none; }
+.wlabel {
+  font-size:11px; font-weight:700; color:#fff; text-align:center;
+  padding:2px 7px; margin-top:3px;
+  text-shadow:0 1px 5px rgba(0,0,0,.95);
+  max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  pointer-events:none;
+}
+.wvalue { font-size:13px; color:#fff; margin-top:2px; text-shadow:0 1px 5px rgba(0,0,0,.95); pointer-events:none; }
+.wremove {
+  position:absolute; top:5px; right:6px;
+  background:rgba(0,0,0,.38); color:#fff; border:none; border-radius:50%;
+  width:20px; height:20px; font-size:11px; line-height:20px; text-align:center;
+  cursor:pointer; padding:0; z-index:2;
+}
+.wsrc { position:absolute; bottom:4px; left:7px; font-size:9px; color:rgba(255,255,255,.5); pointer-events:none; }
+
+.wslider {
+  width:-webkit-calc(100% - 18px); width:calc(100% - 18px);
+  margin:5px 9px 0; -webkit-appearance:none; appearance:none;
+  height:5px; border-radius:3px; background:rgba(255,255,255,.3); outline:none; cursor:pointer;
+}
+.wslider::-webkit-slider-thumb {
+  -webkit-appearance:none; width:20px; height:20px; border-radius:50%;
+  background:#fff; cursor:pointer; -webkit-box-shadow:0 1px 5px rgba(0,0,0,.45); box-shadow:0 1px 5px rgba(0,0,0,.45);
+}
+.wslider::-moz-range-thumb { width:20px; height:20px; border-radius:50%; background:#fff; cursor:pointer; border:none; }
+
+.charts-area { padding:0 2px; }
+.chart-wrap { background:#1e1e1e; margin:8px; padding:10px 12px; border-radius:8px; }
+.chart-header {
+  display:-webkit-box; display:-webkit-flex; display:flex;
+  -webkit-justify-content:space-between; justify-content:space-between;
+  -webkit-align-items:center; align-items:center; margin-bottom:6px;
+}
+.chart-title { font-size:13px; font-weight:600; }
+.chart-remove { background:rgba(255,255,255,.12); color:#fff; border:none; border-radius:4px; width:26px; height:26px; font-size:13px; cursor:pointer; padding:0; }
+
+#modal {
+  display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(0,0,0,.68); z-index:200; overflow-y:auto; text-align:center; padding:30px 0 20px;
+}
+#modal.open { display:block; }
+.mbox {
+  display:inline-block; text-align:left; background:#1e1e1e; border-radius:10px;
+  padding:18px; width:90%; max-width:400px; vertical-align:top;
+}
+.mbox h3 { font-size:15px; margin-bottom:12px; }
+.step { display:none; }
+.step.active { display:block; }
+.type-btn {
+  display:block; width:100%; padding:12px 10px; margin:5px 0;
+  background:#2d2d2d; color:#fff; border:1px solid #444; border-radius:8px;
+  font-size:14px; cursor:pointer; text-align:left;
+}
+.fg { margin-top:10px; }
+.fg label { display:block; font-size:11px; color:#999; margin-bottom:3px; }
+.fg input[type="text"], .fg input[type="number"], .fg select {
+  width:100%; padding:8px; background:#2a2a2a; color:#fff;
+  border:1px solid #444; border-radius:4px; font-size:13px; -webkit-appearance:none; appearance:none;
+}
+.fg select[multiple] { height:110px; -webkit-appearance:none; }
+.fg input:focus, .fg select:focus { outline:none; border-color:#0078d7; }
+.rgroup { display:-webkit-box; display:-webkit-flex; display:flex; margin-top:6px; }
+.rgroup label {
+  display:-webkit-box; display:-webkit-flex; display:flex;
+  -webkit-align-items:center; align-items:center;
+  font-size:13px; cursor:pointer; margin-right:16px;
+}
+.rgroup input[type="radio"] { margin-right:5px; }
+.mbtns { display:-webkit-box; display:-webkit-flex; display:flex; margin-top:14px; }
+.mbtns button { -webkit-flex:1; flex:1; padding:10px; border:none; border-radius:6px; font-size:13px; cursor:pointer; margin-right:6px; }
+.mbtns button:last-child { margin-right:0; }
+.btn-p { background:#0078d7; color:#fff; }
+.btn-s { background:#383838; color:#fff; }
+.color-row { display:-webkit-box; display:-webkit-flex; display:flex; margin-top:6px; -webkit-flex-wrap:wrap; flex-wrap:wrap; }
+.color-swatch { width:30px; height:30px; border-radius:6px; margin:3px; cursor:pointer; border:2px solid transparent; }
+.color-swatch.selected { border-color:#fff; }
+.tb-right { display:-webkit-box; display:-webkit-flex; display:flex; -webkit-align-items:center; align-items:center; }
+#stDot { color:#c0392b; font-size:12px; vertical-align:1px; }
+#stDot.ok { color:#2ecc71; }
+#setBtn { background:#333; color:#fff; border:1px solid #555; border-radius:4px; width:30px; height:28px;
+  font-size:15px; margin-right:6px; cursor:pointer; padding:0; line-height:26px; }
+#connBanner { display:none; background:#7a2a00; color:#fff; font-size:12px; padding:5px 12px; text-align:center; }
+#connBanner.show { display:block; }
+.fg input[type="password"] { width:100%; padding:8px; background:#2a2a2a; color:#fff;
+  border:1px solid #444; border-radius:4px; font-size:13px; -webkit-appearance:none; appearance:none; }
+.fg .chk { display:-webkit-box; display:-webkit-flex; display:flex; -webkit-align-items:center; align-items:center; font-size:13px; color:#fff; }
+.fg .chk input { margin-right:6px; }
+.stinfo { font-size:11px; color:#999; line-height:1.6; background:#252525; border-radius:6px; padding:8px; margin-top:10px; }
+.sechead { font-size:12px; color:#0a84ff; margin-top:14px; font-weight:700; }
+.dl-link { display:block; text-align:center; color:#0a84ff; font-size:12px; margin-top:10px; }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <h2><span id="stDot" title="MQTT getrennt">&#9679;</span> MQTT Dashboard</h2>
+  <div class="tb-right">
+  <button id="setBtn" onclick="openSettings()" title="Einstellungen">&#9881;</button>
+  <select id="rangeSelect" onchange="onRangeChange(this.value)">
+    <option value="48">48 h</option>
+    <option value="24" selected>24 h</option>
+    <option value="12">12 h</option>
+    <option value="6">6 h</option>
+    <option value="1">1 h</option>
+  </select>
+  </div>
+</div>
+
+<div id="connBanner">Verbindung zum Dashboard getrennt &#8211; verbinde neu &#8230;</div>
+<div id="vtBar" style="background:#111;padding:4px 10px;min-height:0;border-bottom:1px solid #222;"></div>
+
+<div id="dashboard">
+  <div id="grpsec_default">
+    <div class="widget-grid" id="ggrid_default"></div>
+    <div class="charts-area" id="gcharts_default"></div>
+  </div>
+</div>
+
+<button id="addBtn" onclick="openModal()">+</button>
+
+<div id="modal">
+<div class="mbox">
+
+  <div id="step1" class="step active">
+    <h3>Was hinzuf&#252;gen?</h3>
+    <button class="type-btn" onclick="selectType('group')">&#128193;&#160; Gruppe</button>
+    <button class="type-btn" onclick="selectType('virtual')">&#128296;&#160; Virtuelles Topic</button>
+    <button class="type-btn" onclick="selectType('chart')">&#128200;&#160; Diagramm</button>
+    <button class="type-btn" onclick="selectType('button')">&#128308;&#160; Schaltfl&#228;che</button>
+    <button class="type-btn" onclick="selectType('display')">&#128250;&#160; Anzeige</button>
+    <div class="mbtns" style="margin-top:12px;">
+      <button class="btn-s" onclick="closeModal()">Abbrechen</button>
+    </div>
+  </div>
+
+  <div id="step2group" class="step">
+    <h3>Gruppe erstellen</h3>
+    <div class="fg"><label>Name</label><input type="text" id="gName" placeholder="z.B. Wohnzimmer"></div>
+    <div class="fg">
+      <label>Farbe</label>
+      <div class="color-row" id="colorRow"></div>
+    </div>
+    <div class="mbtns">
+      <button class="btn-s" onclick="goStep('step1')">Zur&#252;ck</button>
+      <button class="btn-p" onclick="confirmAddGroup()">Erstellen</button>
+    </div>
+  </div>
+
+  <div id="step2virtual" class="step">
+    <h3>Virtuelles Topic</h3>
+    <div class="fg"><label>Name des virtuellen Topics (z.B. virtual/diff)</label><input type="text" id="vtName" placeholder="z.B. virtual/differenz"></div>
+    <div class="fg"><label>Quell-Topics (Reihenfolge = a, b, c&#8230;)</label><select id="vtTopicSelect" multiple></select></div>
+    <div class="fg"><label>Formel &#8212; z.B. <i>a&#160;-&#160;b</i></label><input type="text" id="vtFormula" placeholder="z.B. a - b  oder  (a + b) / 2"></div>
+    <div class="mbtns">
+      <button class="btn-s" onclick="goStep('step1')">Zur&#252;ck</button>
+      <button class="btn-p" onclick="confirmAddVirtual()">Erstellen</button>
+    </div>
+  </div>
+
+  <div id="step2chart" class="step">
+    <h3>Diagramm</h3>
+    <div class="fg"><label>Name</label><input type="text" id="chartName" placeholder="Diagramm-Name"></div>
+    <div class="fg"><label>Topics w&#228;hlen (inkl. virtuelle, Mehrfachauswahl)</label><select id="topicSelect" multiple></select></div>
+    <div class="fg"><label>Gruppe</label><select id="chartGroup"><option value="default">&#8212; Keine Gruppe &#8212;</option></select></div>
+    <div class="mbtns">
+      <button class="btn-s" onclick="goStep('step1')">Zur&#252;ck</button>
+      <button class="btn-p" onclick="confirmAddChart()">Hinzuf&#252;gen</button>
+    </div>
+  </div>
+
+  <div id="step2widget" class="step">
+    <h3 id="widgetTitle">Schaltfl&#228;che</h3>
+    <div class="fg"><label>Bezeichnung</label><input type="text" id="wName" placeholder="z.B. Wohnzimmer Licht"></div>
+    <div class="fg"><label>Topic</label><input type="text" id="wTopic" placeholder="z.B. home/light/wz" list="knownList"><datalist id="knownList"></datalist></div>
+    <div class="fg">
+      <label>Ger&#228;t</label>
+      <select id="wDevice">
+        <option value="lamp">&#128161; Lampe</option>
+        <option value="fan">&#127744; L&#252;fter</option>
+        <option value="camera">&#128247; Kamera</option>
+        <option value="shutter">&#9776; Rolladen</option>
+        <option value="motion">&#128065; Bewegungsmelder</option>
+        <option value="plug">&#128268; Steckdose</option>
+        <option value="heating">&#128293; Heizung</option>
+        <option value="ac">&#10052; Klimaanlage</option>
+        <option value="lock">&#128274; Schloss</option>
+        <option value="speaker">&#128266; Lautsprecher</option>
+        <option value="sensor">&#128202; Sensor</option>
+        <option value="generic">&#9881; Ger&#228;t</option>
+      </select>
+    </div>
+    <div class="fg"><label>Gruppe</label><select id="wGroup"><option value="default">&#8212; Keine Gruppe &#8212;</option></select></div>
+    <div id="subtypeRow" class="fg">
+      <label>Typ</label>
+      <div class="rgroup">
+        <label><input type="radio" name="wSubtype" value="switch" checked onchange="onSubtypeChange()"> Schalter</label>
+        <label><input type="radio" name="wSubtype" value="slider" onchange="onSubtypeChange()"> Slider</label>
+      </div>
+    </div>
+    <div id="switchFields">
+      <div class="fg"><label>Payload &#8211; Aktiviert (AN)</label><input type="text" id="wPayloadOn" placeholder="z.B. 1 oder ON"></div>
+      <div class="fg"><label>Payload &#8211; Deaktiviert (AUS)</label><input type="text" id="wPayloadOff" placeholder="z.B. 0 oder OFF"></div>
+    </div>
+    <div id="sliderFields" style="display:none;">
+      <div class="fg"><label>Minimum</label><input type="number" id="wSlMin" value="0"></div>
+      <div class="fg"><label>Maximum</label><input type="number" id="wSlMax" value="100"></div>
+      <div class="fg"><label>Schritt</label><input type="number" id="wSlStep" value="1"></div>
+    </div>
+    <div class="mbtns">
+      <button class="btn-s" onclick="goStep('step1')">Zur&#252;ck</button>
+      <button class="btn-p" onclick="confirmAddWidget()">Hinzuf&#252;gen</button>
+    </div>
+  </div>
+
+  <div id="stepSettings" class="step">
+    <h3>Einstellungen</h3>
+    <div class="sechead">MQTT-Broker</div>
+    <div class="fg"><label>Broker (IP oder Name, optional :Port)</label><input type="text" id="sBroker" placeholder="z.B. 192.168.1.10 oder 192.168.1.10:1883"></div>
+    <div class="fg"><label>Benutzer (optional)</label><input type="text" id="sUser"></div>
+    <div class="fg"><label>Passwort (leer = unver&#228;ndert)</label><input type="password" id="sPass"></div>
+    <div class="sechead">Netzwerk (&#196;nderung &#8594; Neustart)</div>
+    <div class="fg"><label class="chk"><input type="checkbox" id="sDhcp" onchange="onDhcpChange()"> DHCP verwenden</label></div>
+    <div id="staticFields">
+      <div class="fg"><label>IP-Adresse</label><input type="text" id="sIp"></div>
+      <div class="fg"><label>Subnetzmaske</label><input type="text" id="sMask"></div>
+      <div class="fg"><label>Gateway</label><input type="text" id="sGw"></div>
+      <div class="fg"><label>DNS</label><input type="text" id="sDns"></div>
+    </div>
+    <div class="fg"><label>Hostname</label><input type="text" id="sHost"></div>
+    <div class="fg"><label>NTP-Server</label><input type="text" id="sNtp"></div>
+    <div class="stinfo" id="sInfo"></div>
+    <a class="dl-link" href="/config.json">Konfiguration herunterladen (Backup)</a>
+    <div class="mbtns">
+      <button class="btn-s" onclick="closeModal()">Abbrechen</button>
+      <button class="btn-s" onclick="if(confirm('Gerät neu starten?')) socket.emit('reboot')">Neustart</button>
+      <button class="btn-p" onclick="saveSettings()">Speichern</button>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   MQTT Dashboard – Client JS  (iOS 9 kompatibel, ES5/ES6)
+
+   Performance-Design:
+   - originalData speichert {x: ms_number, y: number} – kein Date-Parsing im Filterloop
+   - Timestamps vom Server als ms-Integer
+   - filterAllCharts: binäre Suche für Cutoff statt linearer Scan
+   - chart.update('none') statt chart.update(0) wo möglich
+   - Decimierung: Chart.js bekommt max. MAX_DISP Punkte
+   - Throttle: Server sendet max. 1 Update/s pro Topic;
+               Client zeichnet max. 1x/s neu (debounce)
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── WebSocket-Verbindung (ersetzt Socket.IO der PC-Version) ── */
+var socket = (function() {
+  var ws = null, handlers = {}, queue = [], isOpen = false, retry = 1000, everOpen = false;
+  function fire(e, d) { var h = handlers[e]; if (h) for (var i = 0; i < h.length; i++) h[i](d); }
+  function connect() {
+    try { ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws"); }
+    catch (e) { setTimeout(connect, retry); return; }
+    ws.onopen = function() {
+      isOpen = true; retry = 1000;
+      document.getElementById("connBanner").className = "";
+      if (everOpen) { location.reload(); return; }
+      everOpen = true;
+      while (queue.length) ws.send(queue.shift());
+      fire("connect");
+    };
+    ws.onmessage = function(ev) { var m; try { m = JSON.parse(ev.data); } catch (e) { return; } fire(m.e, m.d); };
+    ws.onclose = function() {
+      isOpen = false;
+      document.getElementById("connBanner").className = "show";
+      setDot(false);
+      setTimeout(connect, retry); retry = Math.min(retry * 2, 10000);
+    };
+    ws.onerror = function() { try { ws.close(); } catch (e) {} };
+  }
+  connect();
+  return {
+    on: function(e, f) { (handlers[e] = handlers[e] || []).push(f); },
+    emit: function(e, d) {
+      var s = JSON.stringify({ e: e, d: d === undefined ? null : d });
+      if (isOpen) ws.send(s); else queue.push(s);
+    }
+  };
+})();
+var charts            = {};
+var chartFormulas     = {};   /* nicht mehr genutzt, Kompatibilität */
+var selectedRange     = 24;
+var selectedRangeMs   = 24 * 3600000;
+var currentWidgetType = "button";
+var topicStates       = {};
+var activeWidgetsJs   = {};
+var activeGroupsJs    = {};
+var activeVirtualTopicsJs = {};
+
+/* Max. Punkte die an Chart.js übergeben werden (Render-Performance) */
+var MAX_DISP = 800;
+
+/* ── Gruppen-Farben ─────────────────────────────────────────── */
+var GROUP_COLORS = [
+  "#1e2d1e","#1e1e2d","#2d1e1e","#2d2a1e","#1e2a2d","#2a1e2d",
+  "#263020","#202630","#302020","#303025","#202530","#252030"
+];
+var selectedGroupColor = GROUP_COLORS[0];
+
+/* ── Gerätedefinitionen ─────────────────────────────────────── */
+var DEVICES = {
+  lamp:    { icon: "&#128161;", on: "#f5c518", onR: "#c8a010", off: "#3a3010" },
+  fan:     { icon: "&#127744;", on: "#18a8f5", onR: "#1278b5", off: "#0d2a40" },
+  camera:  { icon: "&#128247;", on: "#f53c18", onR: "#b52c10", off: "#3a1008" },
+  shutter: { icon: "&#9776;",   on: "#78b5f5", onR: "#5090c0", off: "#0d2035" },
+  motion:  { icon: "&#128065;", on: "#f5d018", onR: "#c0a010", off: "#383010" },
+  plug:    { icon: "&#128268;", on: "#18f578", onR: "#10b550", off: "#083a20" },
+  heating: { icon: "&#128293;", on: "#f57c18", onR: "#b55010", off: "#3a2008" },
+  ac:      { icon: "&#10052;",  on: "#18c8f5", onR: "#1098b5", off: "#083040" },
+  lock:    { icon: "&#128274;", on: "#a018f5", onR: "#7010b5", off: "#200840" },
+  speaker: { icon: "&#128266;", on: "#18f5e1", onR: "#10b5a0", off: "#083a38" },
+  sensor:  { icon: "&#128202;", on: "#f518c8", onR: "#b51090", off: "#3a0830" },
+  generic: { icon: "&#9881;",   on: "#78f518", onR: "#50b510", off: "#1a3a08" }
+};
+function getDeviceDef(k) { return DEVICES[k] || DEVICES.generic; }
+function getWidgetBg(w, state) {
+  var dev = getDeviceDef(w.device);
+  if (!state) return dev.off;
+  var isOn = w.payload_on !== undefined && state.value === w.payload_on;
+  return isOn ? (state.source === "self" ? dev.on : dev.onR) : dev.off;
+}
+
+/* ── Binäre Suche: erster Index >= cutoffMs ─────────────────── */
+function bisectLeft(arr, cutoffMs) {
+  var lo = 0, hi = arr.length;
+  while (lo < hi) {
+    var mid = (lo + hi) >>> 1;
+    if (arr[mid].x < cutoffMs) lo = mid + 1; else hi = mid;
+  }
+  return lo;
+}
+
+/* ── Gleichmäßige Decimierung ───────────────────────────────── */
+function decimate(arr, maxPts) {
+  if (arr.length <= maxPts) return arr;
+  var out = [];
+  var step = arr.length / maxPts;
+  for (var i = 0; i < maxPts; i++) out.push(arr[Math.round(i * step)]);
+  return out;
+}
+
+/* ── Range ──────────────────────────────────────────────────── */
+function onRangeChange(v) {
+  selectedRange   = parseInt(v, 10);
+  selectedRangeMs = selectedRange * 3600000;
+  /* Bei manueller Range-Änderung sofort und ohne Debounce neu zeichnen */
+  if (_filterTimer) { clearTimeout(_filterTimer); _filterTimer = null; }
+  _doFilterAllCharts();
+}
+
+/* ── Farb-Swatches ──────────────────────────────────────────── */
+(function() {
+  var row = document.getElementById("colorRow");
+  for (var i = 0; i < GROUP_COLORS.length; i++) {
+    (function(color, idx) {
+      var s = document.createElement("div");
+      s.className = "color-swatch" + (idx === 0 ? " selected" : "");
+      s.style.backgroundColor = color;
+      s.onclick = function() {
+        var all = document.querySelectorAll(".color-swatch");
+        for (var j = 0; j < all.length; j++) all[j].className = "color-swatch";
+        s.className = "color-swatch selected";
+        selectedGroupColor = color;
+      };
+      row.appendChild(s);
+    })(GROUP_COLORS[i], i);
+  }
+})();
+
+/* ── Modal ──────────────────────────────────────────────────── */
+function openModal() { socket.emit("request_topics"); goStep("step1"); document.getElementById("modal").className = "open"; }
+function closeModal() { document.getElementById("modal").className = ""; }
+function goStep(id) {
+  var steps = document.querySelectorAll(".step");
+  for (var i = 0; i < steps.length; i++) steps[i].className = "step";
+  document.getElementById(id).className = "step active";
+}
+function selectType(type) {
+  currentWidgetType = type;
+  if (type === "group")   { goStep("step2group");   return; }
+  if (type === "virtual") { goStep("step2virtual"); return; }
+  if (type === "chart")   { goStep("step2chart");   return; }
+  document.getElementById("widgetTitle").innerHTML = type === "button" ? "Schaltfl&#228;che" : "Anzeige";
+  document.getElementById("subtypeRow").style.display = type === "button" ? "block" : "none";
+  document.getElementById("switchFields").style.display = "block";
+  document.getElementById("sliderFields").style.display = "none";
+  var radios = document.querySelectorAll("input[name='wSubtype']");
+  for (var i = 0; i < radios.length; i++) radios[i].checked = radios[i].value === "switch";
+  goStep("step2widget");
+}
+function onSubtypeChange() {
+  var val = "switch";
+  var r = document.querySelectorAll("input[name='wSubtype']");
+  for (var i = 0; i < r.length; i++) { if (r[i].checked) val = r[i].value; }
+  document.getElementById("switchFields").style.display = val === "switch" ? "block" : "none";
+  document.getElementById("sliderFields").style.display = val === "slider" ? "block" : "none";
+}
+
+/* ── Gruppen-Selects ────────────────────────────────────────── */
+function refreshGroupSelects() {
+  var selIds = ["chartGroup", "wGroup"];
+  for (var s = 0; s < selIds.length; s++) {
+    var sel = document.getElementById(selIds[s]);
+    if (!sel) continue;
+    var cur = sel.value;
+    sel.innerHTML = "<option value=\"default\">\u2014 Keine Gruppe \u2014</option>";
+    var gids = Object.keys(activeGroupsJs);
+    for (var i = 0; i < gids.length; i++) {
+      var g = activeGroupsJs[gids[i]];
+      var opt = document.createElement("option");
+      opt.value = g.id; opt.innerText = g.name; sel.appendChild(opt);
+    }
+    if (cur) sel.value = cur;
+  }
+}
+
+/* ── Topics laden ───────────────────────────────────────────── */
+socket.on("topic_list", function(topics) {
+  var sels = [document.getElementById("topicSelect"), document.getElementById("vtTopicSelect")];
+  for (var s = 0; s < sels.length; s++) {
+    if (!sels[s]) continue;
+    sels[s].innerHTML = "";
+    for (var i = 0; i < topics.length; i++) {
+      var opt = document.createElement("option");
+      opt.value = topics[i]; opt.innerText = topics[i]; sels[s].appendChild(opt);
+    }
+  }
+  var dl = document.getElementById("knownList");
+  dl.innerHTML = "";
+  for (var j = 0; j < topics.length; j++) {
+    var o = document.createElement("option"); o.value = topics[j]; dl.appendChild(o);
+  }
+});
+
+/* ── Gruppe ─────────────────────────────────────────────────── */
+function confirmAddGroup() {
+  var name = document.getElementById("gName").value.trim();
+  if (!name) return;
+  socket.emit("add_group", { id: "grp_" + Date.now(), type: "group", name: name, color: selectedGroupColor });
+  document.getElementById("gName").value = "";
+  closeModal();
+}
+socket.on("init_group", function(g) { activeGroupsJs[g.id] = g; renderGroup(g); refreshGroupSelects(); });
+socket.on("remove_group", function(d) {
+  delete activeGroupsJs[d.group_id];
+  var sec = document.getElementById("grpsec_" + d.group_id);
+  if (sec) {
+    var defGrid = document.getElementById("ggrid_default");
+    var defCharts = document.getElementById("gcharts_default");
+    var grid = document.getElementById("ggrid_" + d.group_id);
+    var ca   = document.getElementById("gcharts_" + d.group_id);
+    if (grid) while (grid.firstChild) defGrid.appendChild(grid.firstChild);
+    if (ca)   while (ca.firstChild)   defCharts.appendChild(ca.firstChild);
+    sec.parentNode.removeChild(sec);
+  }
+  refreshGroupSelects();
+});
+function renderGroup(g) {
+  if (document.getElementById("grpsec_" + g.id)) return;
+  var sec = document.createElement("div");
+  sec.className = "group-section"; sec.id = "grpsec_" + g.id;
+  sec.style.backgroundColor = g.color || "#1e2d1e";
+  var hdr = document.createElement("div"); hdr.className = "group-header";
+  var tog = document.createElement("button"); tog.className = "group-toggle"; tog.innerHTML = "&#9660;";
+  var ttl = document.createElement("div"); ttl.className = "group-header-title"; ttl.innerText = g.name;
+  var rm  = document.createElement("button"); rm.className = "group-hbtn"; rm.innerHTML = "&#215;";
+  rm.onclick = (function(gid){ return function(e){ e.stopPropagation(); socket.emit("remove_group",{group_id:gid}); }; })(g.id);
+  hdr.appendChild(tog); hdr.appendChild(ttl); hdr.appendChild(rm);
+  var body = document.createElement("div"); body.className = "group-body"; body.id = "gbody_" + g.id;
+  var wg   = document.createElement("div"); wg.className = "widget-grid"; wg.id = "ggrid_" + g.id;
+  var ca   = document.createElement("div"); ca.className = "charts-area"; ca.id = "gcharts_" + g.id;
+  body.appendChild(wg); body.appendChild(ca);
+  hdr.onclick = (function(b, t){ return function(){
+    if (b.className.indexOf("collapsed") >= 0) { b.className = "group-body"; t.innerHTML = "&#9660;"; }
+    else { b.className = "group-body collapsed"; t.innerHTML = "&#9658;"; }
+  }; })(body, tog);
+  sec.appendChild(hdr); sec.appendChild(body);
+  document.getElementById("dashboard").appendChild(sec);
+}
+
+/* ── Virtuelles Topic ───────────────────────────────────────── */
+function confirmAddVirtual() {
+  var vname   = document.getElementById("vtName").value.trim();
+  var formula = document.getElementById("vtFormula").value.trim();
+  var sel     = document.getElementById("vtTopicSelect");
+  var sources = [];
+  for (var i = 0; i < sel.options.length; i++) { if (sel.options[i].selected) sources.push(sel.options[i].value); }
+  if (!vname || !formula || sources.length === 0) return;
+  socket.emit("add_virtual_topic", { id:"vt_"+Date.now(), type:"virtual", vname:vname, sources:sources, formula:formula });
+  document.getElementById("vtName").value = "";
+  document.getElementById("vtFormula").value = "";
+  closeModal();
+}
+socket.on("init_virtual_topic", function(vt) { activeVirtualTopicsJs[vt.id] = vt; renderVirtualTopic(vt); });
+socket.on("remove_virtual_topic", function(d) {
+  delete activeVirtualTopicsJs[d.vid];
+  var el = document.getElementById("vtbadge_" + d.vid);
+  if (el && el.parentNode) el.parentNode.removeChild(el);
+});
+function renderVirtualTopic(vt) {
+  if (document.getElementById("vtbadge_" + vt.id)) return;
+  var badge = document.createElement("span");
+  badge.id = "vtbadge_" + vt.id;
+  badge.title = vt.sources.join(", ") + "  \u21d2  " + vt.formula;
+  badge.style.cssText = "display:inline-block;background:#1e3a1e;border:1px solid #3a6a3a;border-radius:5px;padding:3px 8px;margin:3px;font-size:11px;";
+  var txt = document.createElement("span"); txt.innerText = vt.vname;
+  var rm  = document.createElement("button");
+  rm.innerHTML = "&#215;";
+  rm.style.cssText = "background:none;border:none;color:#aaa;cursor:pointer;margin-left:5px;padding:0;font-size:12px;";
+  rm.onclick = (function(vid){ return function(){ socket.emit("remove_virtual_topic",{vid:vid}); }; })(vt.id);
+  badge.appendChild(txt); badge.appendChild(rm);
+  document.getElementById("vtBar").appendChild(badge);
+}
+
+/* ── Ziel-Container ─────────────────────────────────────────── */
+function getGridId(gid)   { return document.getElementById("ggrid_"   +(gid||"default")) ? "ggrid_"  +(gid||"default") : "ggrid_default"; }
+function getChartsId(gid) { return document.getElementById("gcharts_" +(gid||"default")) ? "gcharts_"+(gid||"default") : "gcharts_default"; }
+
+/* ── Diagramm hinzufügen ────────────────────────────────────── */
+function confirmAddChart() {
+  var sel = document.getElementById("topicSelect");
+  var selected = [];
+  for (var i = 0; i < sel.options.length; i++) { if (sel.options[i].selected) selected.push(sel.options[i].value); }
+  if (selected.length === 0) return;
+  var name     = document.getElementById("chartName").value.trim() || "Multi-Topic Diagramm";
+  var group_id = document.getElementById("chartGroup").value || "default";
+  socket.emit("add_topics", { chart_id:"chart_"+Date.now(), topics:selected, name:name, formula:"", group_id:group_id });
+  document.getElementById("chartName").value = "";
+  closeModal();
+}
+
+/* ── Widget hinzufügen ──────────────────────────────────────── */
+function confirmAddWidget() {
+  var name     = document.getElementById("wName").value.trim();
+  var topic    = document.getElementById("wTopic").value.trim();
+  var device   = document.getElementById("wDevice").value;
+  var group_id = document.getElementById("wGroup").value || "default";
+  if (!name || !topic) return;
+  var subtype = "switch";
+  if (currentWidgetType === "button") {
+    var r = document.querySelectorAll("input[name='wSubtype']");
+    for (var i = 0; i < r.length; i++) { if (r[i].checked) subtype = r[i].value; }
+  }
+  var wtype = currentWidgetType === "display" ? "display" : subtype === "slider" ? "slider" : "button";
+  var prefix = wtype === "display" ? "disp_" : wtype === "slider" ? "slid_" : "btn_";
+  var w = { id:prefix+Date.now(), type:wtype, name:name, topic:topic, device:device, group_id:group_id };
+  if (wtype === "button" || wtype === "display") {
+    w.payload_on  = document.getElementById("wPayloadOn").value;
+    w.payload_off = document.getElementById("wPayloadOff").value;
+  }
+  if (wtype === "slider") {
+    w.slider_min  = parseFloat(document.getElementById("wSlMin").value)  || 0;
+    w.slider_max  = parseFloat(document.getElementById("wSlMax").value)  || 100;
+    w.slider_step = parseFloat(document.getElementById("wSlStep").value) || 1;
+  }
+  socket.emit("add_widget", w);
+  document.getElementById("wName").value = "";
+  document.getElementById("wTopic").value = "";
+  closeModal();
+}
+
+/* ── Widget rendern ─────────────────────────────────────────── */
+function renderWidget(w) {
+  if (document.getElementById(w.id)) return;
+  var dev = getDeviceDef(w.device), state = topicStates[w.topic];
+  var card = document.createElement("div");
+  card.className = "widget-card"; card.id = w.id;
+  card.style.backgroundColor = getWidgetBg(w, state);
+  var icon = document.createElement("div"); icon.className = "wicon"; icon.innerHTML = dev.icon;
+  var lbl  = document.createElement("div"); lbl.className = "wlabel"; lbl.innerText = w.name;
+  var val  = document.createElement("div"); val.className = "wvalue"; val.id = w.id+"_val"; val.innerText = state ? state.value : "\u2013";
+  var rm   = document.createElement("button"); rm.className = "wremove"; rm.innerHTML = "&#215;";
+  rm.onclick = (function(wid){ return function(e){ e.stopPropagation(); socket.emit("remove_widget",{widget_id:wid}); }; })(w.id);
+  var src  = document.createElement("div"); src.className = "wsrc"; src.id = w.id+"_src";
+  src.innerText = state ? (state.source==="self" ? "\u25cf eigen" : "\u25cb extern") : "";
+  card.appendChild(icon); card.appendChild(lbl);
+  if (w.type === "slider") {
+    var sl = document.createElement("input");
+    sl.type="range"; sl.className="wslider"; sl.id=w.id+"_sl";
+    sl.min = w.slider_min||0; sl.max = w.slider_max||100; sl.step = w.slider_step||1;
+    if (state && !isNaN(parseFloat(state.value))) sl.value = parseFloat(state.value);
+    var slT = null;
+    sl.oninput = (function(ww, ss){ return function(){
+      clearTimeout(slT);
+      var v = ss.value;
+      var ve = document.getElementById(ww.id+"_val"); if (ve) ve.innerText = v;
+      slT = setTimeout(function(){ socket.emit("publish_mqtt",{topic:ww.topic,payload:v}); }, 200);
+    }; })(w, sl);
+    sl.onclick = function(e){ e.stopPropagation(); };
+    card.appendChild(sl); card.appendChild(val);
+  } else {
+    card.appendChild(val);
+    if (w.type === "button") {
+      card.onclick = (function(ww){ return function(){
+        var cur = topicStates[ww.topic];
+        var isOn = cur && cur.value === ww.payload_on;
+        socket.emit("publish_mqtt",{topic:ww.topic, payload: isOn ? ww.payload_off : ww.payload_on});
+      }; })(w);
+    }
+  }
+  card.appendChild(src); card.appendChild(rm);
+  document.getElementById(getGridId(w.group_id)).appendChild(card);
+}
+
+function updateWidgetStates(topic, state) {
+  var ids = Object.keys(activeWidgetsJs);
+  for (var i = 0; i < ids.length; i++) {
+    var w = activeWidgetsJs[ids[i]];
+    if (w.topic !== topic) continue;
+    var card = document.getElementById(w.id); if (!card) continue;
+    card.style.backgroundColor = getWidgetBg(w, state);
+    var ve = document.getElementById(w.id+"_val"); if (ve) ve.innerText = state.value;
+    var se = document.getElementById(w.id+"_src"); if (se) se.innerText = state.source==="self" ? "\u25cf eigen" : "\u25cb extern";
+    if (w.type==="slider") { var sl=document.getElementById(w.id+"_sl"); if(sl && !isNaN(parseFloat(state.value))) sl.value=parseFloat(state.value); }
+  }
+}
+socket.on("init_widget",   function(w){ activeWidgetsJs[w.id]=w; renderWidget(w); });
+socket.on("remove_widget", function(d){ delete activeWidgetsJs[d.widget_id]; var el=document.getElementById(d.widget_id); if(el&&el.parentNode) el.parentNode.removeChild(el); });
+
+/* ── Diagramm erstellen ─────────────────────────────────────── */
+function createChart(cid, datasets, name, group_id) {
+  if (charts[cid]) return;
+  var wrap  = document.createElement("div"); wrap.className="chart-wrap"; wrap.id=cid;
+  var hdr   = document.createElement("div"); hdr.className="chart-header";
+  var title = document.createElement("div"); title.className="chart-title"; title.innerText=name;
+  var rmBtn = document.createElement("button"); rmBtn.className="chart-remove"; rmBtn.innerText="X";
+  rmBtn.onclick = (function(id){ return function(){ socket.emit("remove_chart",{chart_id:id}); }; })(cid);
+  hdr.appendChild(title); hdr.appendChild(rmBtn);
+  var canvas = document.createElement("canvas");
+  wrap.appendChild(hdr); wrap.appendChild(canvas);
+  document.getElementById(getChartsId(group_id)).appendChild(wrap);
+
+  var chartDatasets = datasets.map(function(ds) {
+    /* originalData als Array von {x:ms_number, y:number}; Verlauf kommt per topic_hist */
+    var orig = histCache[ds.topic] ? histCache[ds.topic].slice() : [];
+    return {
+      label: ds.topic, data: [], originalData: orig,
+      borderColor: ds.color, backgroundColor: ds.color,
+      fill: false, pointRadius: 0, borderWidth: 2, lineTension: 0.1
+    };
+  });
+
+  charts[cid] = new Chart(canvas, {
+    type: "line",
+    data: { datasets: chartDatasets },
+    options: {
+      animation: { duration: 0 },
+      responsive: true, maintainAspectRatio: true,
+      legend: { labels: { fontColor: "#ccc", fontSize: 11 } },
+      scales: {
+        xAxes: [{ type:"time",
+          time: { tooltipFormat:"DD.MM HH:mm", displayFormats:{minute:"HH:mm",hour:"HH:mm",day:"DD.MM"} },
+          ticks: { fontColor:"#888", maxRotation:0, autoSkip:true, maxTicksLimit:8 },
+          gridLines: { color:"rgba(255,255,255,.08)" }
+        }],
+        yAxes: [{ ticks:{fontColor:"#888",beginAtZero:false}, gridLines:{color:"rgba(255,255,255,.08)"} }]
+      },
+      tooltips: { mode:"index", intersect:false }
+    }
+  });
+  filterAllCharts();
+}
+
+socket.on("init_chart", function(d) {
+  createChart(d.chart_id, d.datasets, d.name, d.group_id);
+});
+socket.on("remove_chart", function(d) {
+  if (charts[d.chart_id]) { charts[d.chart_id].destroy(); delete charts[d.chart_id]; }
+  var el = document.getElementById(d.chart_id);
+  if (el && el.parentNode) el.parentNode.removeChild(el);
+});
+
+/* ── Verlauf vom Geraet (Ringpuffer: fein 30 s / grob 4 min) ── */
+var histCache = {};
+function expandHist(h) {
+  var out = [], i, t;
+  var fineStart = h.fine ? h.fine.t0 : Infinity;
+  if (h.coarse) {
+    for (i = 0; i < h.coarse.v.length; i++) {
+      t = h.coarse.t0 + i * h.coarse.step;
+      if (t >= fineStart) break;
+      if (h.coarse.v[i] !== null) out.push({ x: t + h.coarse.step / 2, y: h.coarse.v[i] });
+    }
+  }
+  if (h.fine) {
+    for (i = 0; i < h.fine.v.length; i++) {
+      if (h.fine.v[i] !== null) out.push({ x: h.fine.t0 + i * h.fine.step + h.fine.step / 2, y: h.fine.v[i] });
+    }
+  }
+  return out;
+}
+socket.on("topic_hist", function(h) {
+  var pts = expandHist(h);
+  histCache[h.topic] = pts;
+  var lastTs = pts.length ? pts[pts.length - 1].x : 0;
+  var ids = Object.keys(charts);
+  for (var i = 0; i < ids.length; i++) {
+    var ch = charts[ids[i]];
+    for (var j = 0; j < ch.data.datasets.length; j++) {
+      var ds = ch.data.datasets[j];
+      if (ds.label !== h.topic) continue;
+      var live = [];
+      for (var k = 0; k < ds.originalData.length; k++) if (ds.originalData[k].x > lastTs) live.push(ds.originalData[k]);
+      ds.originalData = pts.concat(live);
+    }
+  }
+  if (_filterTimer) { clearTimeout(_filterTimer); _filterTimer = null; }
+  _schedDraw();
+});
+
+/* ── MQTT-Aktualisierungen ──────────────────────────────────── */
+socket.on("mqtt_update", function(d) {
+  topicStates[d.topic] = { value: d.value, source: d.source };
+  updateWidgetStates(d.topic, topicStates[d.topic]);
+  if (d.numeric !== null && d.numeric !== undefined) {
+    var tsMs = typeof d.ts === "number" ? d.ts : new Date(d.ts).getTime();
+    /* Geraeteuhr noch nicht gestellt -> Browserzeit verwenden */
+    if (Math.abs(tsMs - Date.now()) > 120000) tsMs = Date.now();
+    var ids = Object.keys(charts);
+    for (var i = 0; i < ids.length; i++) {
+      var ch = charts[ids[i]];
+      for (var j = 0; j < ch.data.datasets.length; j++) {
+        var ds = ch.data.datasets[j];
+        if (ds.label === d.topic) ds.originalData.push({ x: tsMs, y: d.numeric });
+      }
+    }
+    if (histCache[d.topic]) histCache[d.topic].push({ x: tsMs, y: d.numeric });
+    filterAllCharts();
+  }
+});
+
+/* ── Filter mit binärer Suche + Decimierung ─────────────────── */
+var _filterTimer  = null;
+var _pendingDraw  = false;   /* requestAnimationFrame Guard */
+
+function filterAllCharts() {
+  /* Debounce: frühestens 2s nach letztem Aufruf neu zeichnen          */
+  /* So werden Bursts von mqtt_updates zu einem einzigen Redraw gebündelt */
+  if (_filterTimer) return;
+  _filterTimer = setTimeout(function() {
+    _filterTimer = null;
+    _schedDraw();
+  }, 2000);
+}
+
+function _schedDraw() {
+  if (_pendingDraw) return;
+  _pendingDraw = true;
+  /* requestAnimationFrame ist in iOS 9 vorhanden */
+  var raf = window.requestAnimationFrame || function(cb){ setTimeout(cb, 16); };
+  raf(function() { _pendingDraw = false; _doFilterAllCharts(); });
+}
+
+function _doFilterAllCharts() {
+  var now      = Date.now();
+  var cutoffMs = now - selectedRangeMs;
+
+  var unit;
+  if      (selectedRange <= 2)  unit = "minute";
+  else if (selectedRange <= 24) unit = "hour";
+  else                          unit = "day";
+
+  var ids = Object.keys(charts);
+  for (var i = 0; i < ids.length; i++) {
+    var chart = charts[ids[i]];
+    for (var j = 0; j < chart.data.datasets.length; j++) {
+      var ds   = chart.data.datasets[j];
+      var orig = ds.originalData;
+      var start = bisectLeft(orig, cutoffMs);
+      ds.data = decimate(orig.slice(start), MAX_DISP);
+    }
+    /* Zeiteinheit setzen – KEIN ticks.min/max, das verursacht Flackern.
+       Chart.js skaliert die Achse automatisch anhand ds.data.            */
+    chart.options.scales.xAxes[0].time.unit = unit;
+    /* update(0) ist in Chart.js 2.x stabiler als update("none")
+       wenn sich die Achsenskalierung ändert.                              */
+    chart.update(0);
+  }
+}
+
+/* ── Zustand wiederherstellen ───────────────────────────────── */
+socket.on("connect", function() {
+  socket.emit("set_time", Date.now());
+  socket.emit("request_state");
+});
+socket.on("restore_state", function(data) {
+  if (!data.broker_set) {
+    var broker = prompt("MQTT Broker IP-Adresse:");
+    if (broker) socket.emit("set_broker", { broker: broker });
+  }
+  topicStates = data.topic_states || {};
+  var vtList = data.virtual_topics || [];
+  for (var vt = 0; vt < vtList.length; vt++) { activeVirtualTopicsJs[vtList[vt].id]=vtList[vt]; renderVirtualTopic(vtList[vt]); }
+  var groups = data.groups || [];
+  for (var g = 0; g < groups.length; g++) { activeGroupsJs[groups[g].id]=groups[g]; renderGroup(groups[g]); }
+  refreshGroupSelects();
+  for (var i = 0; i < data.widgets.length; i++) { activeWidgetsJs[data.widgets[i].id]=data.widgets[i]; renderWidget(data.widgets[i]); }
+  for (var j = 0; j < data.charts.length; j++) {
+    var c = data.charts[j];
+    createChart(c.chart_id, c.datasets, c.name, c.group_id);
+  }
+});
+
+/* ── Status / Einstellungen ─────────────────────────────────── */
+var lastStatus = null;
+function setDot(ok) {
+  var d = document.getElementById("stDot");
+  d.className = ok ? "ok" : "";
+  d.title = ok ? "MQTT verbunden" : "MQTT getrennt";
+}
+function fmtUptime(s) {
+  var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  return (d ? d + " d " : "") + h + " h " + m + " min";
+}
+function renderStatus(st) {
+  if (!st) return;
+  var el = document.getElementById("sInfo");
+  el.innerHTML = "Ger&#228;t: " + st.ip + " &#160;|&#160; MQTT: " + (st.mqtt ? "verbunden" : "getrennt") +
+    "<br>Uhrzeit: " + (st.ntp ? "NTP" : (st.time_ok ? "vom Browser" : "nicht gestellt")) +
+    " &#160;|&#160; Laufzeit: " + fmtUptime(st.uptime) +
+    "<br>Topics: " + st.topics + " &#160;|&#160; mit Verlauf: " + st.hist + " &#160;|&#160; freier RAM: " + Math.round(st.mem / 1024) + " KB" +
+    "<br>Firmware: " + st.version;
+}
+socket.on("status", function(st) { lastStatus = st; setDot(st.mqtt); renderStatus(st); });
+socket.on("error", function(m) { alert(m); });
+function openSettings() {
+  socket.emit("get_settings");
+  goStep("stepSettings");
+  document.getElementById("modal").className = "open";
+}
+function onDhcpChange() {
+  document.getElementById("staticFields").style.display = document.getElementById("sDhcp").checked ? "none" : "block";
+}
+socket.on("settings", function(s) {
+  document.getElementById("sBroker").value = s.broker || "";
+  document.getElementById("sUser").value = s.mqtt_user || "";
+  document.getElementById("sPass").value = "";
+  document.getElementById("sPass").placeholder = s.mqtt_password_set ? "\u2022\u2022\u2022\u2022 (gesetzt)" : "";
+  document.getElementById("sDhcp").checked = !!s.dhcp;
+  document.getElementById("sIp").value = s.ip || "";
+  document.getElementById("sMask").value = s.mask || "";
+  document.getElementById("sGw").value = s.gw || "";
+  document.getElementById("sDns").value = s.dns || "";
+  document.getElementById("sHost").value = s.hostname || "";
+  document.getElementById("sNtp").value = s.ntp || "";
+  onDhcpChange();
+  renderStatus(s.status);
+});
+function saveSettings() {
+  var d = {
+    broker: document.getElementById("sBroker").value.trim(),
+    mqtt_user: document.getElementById("sUser").value.trim(),
+    dhcp: document.getElementById("sDhcp").checked,
+    ip: document.getElementById("sIp").value.trim(),
+    mask: document.getElementById("sMask").value.trim(),
+    gw: document.getElementById("sGw").value.trim(),
+    dns: document.getElementById("sDns").value.trim(),
+    hostname: document.getElementById("sHost").value.trim(),
+    ntp: document.getElementById("sNtp").value.trim()
+  };
+  var pw = document.getElementById("sPass").value;
+  if (pw) d.mqtt_password = pw;
+  socket.emit("save_settings", d);
+}
+socket.on("settings_saved", function(r) {
+  closeModal();
+  if (r.reboot) alert("Netzwerkeinstellungen gespeichert. Das Ger\u00e4t startet neu \u2013 ggf. die neue IP-Adresse im Browser aufrufen.");
+});
+
+/* ── Speicher-Aufräumer (alle 5 Min.) ───────────────────────── */
+setInterval(function() {
+  var cutoff48 = Date.now() - 48 * 3600000;
+  var ids = Object.keys(charts);
+  for (var i = 0; i < ids.length; i++) {
+    var ch = charts[ids[i]];
+    for (var j = 0; j < ch.data.datasets.length; j++) {
+      var ds = ch.data.datasets[j];
+      var start = bisectLeft(ds.originalData, cutoff48);
+      if (start > 0) ds.originalData = ds.originalData.slice(start);
+    }
+  }
+  var hk = Object.keys(histCache);
+  for (var h = 0; h < hk.length; h++) {
+    var hs = bisectLeft(histCache[hk[h]], cutoff48);
+    if (hs > 0) histCache[hk[h]] = histCache[hk[h]].slice(hs);
+  }
+  if (_filterTimer) { clearTimeout(_filterTimer); _filterTimer = null; }
+  _schedDraw();
+}, 300000);
+</script>
+</body>
+</html>

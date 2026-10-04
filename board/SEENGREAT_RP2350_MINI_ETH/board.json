@@ -1,0 +1,11 @@
+{
+    "deploy": ["../deploy.md"],
+    "docs": "",
+    "features": ["Dual-core", "External Flash", "USB", "Ethernet"],
+    "images": [],
+    "mcu": "rp2350",
+    "product": "RP2350-MINI(ETH)",
+    "thumbnail": "",
+    "url": "https://seengreat.com/wiki/173/rp2350-mini-eth",
+    "vendor": "Seengreat"
+}
