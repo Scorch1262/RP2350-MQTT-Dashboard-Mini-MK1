@@ -1,5 +1,7 @@
 # MQTT-Dashboard-MK3 – Version für Seengreat RP2350-MINI(ETH)
 
+![Dashboard auf dem RP2350-MINI(ETH)](Bilder/Dashboard-RP2350.png)
+
 Portierung von **MQTT-Dashboard-MK3 V1.9** (Python/Flask/SocketIO) auf das Board
 **Seengreat RP2350-MINI(ETH)** (RP2350A + W5500-Ethernet). Das Dashboard läuft komplett
 auf dem Board – kein PC mehr nötig. Oberfläche und Bedienung entsprechen der PC-Version.
